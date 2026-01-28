@@ -116,15 +116,21 @@ class Agent:
         debate: dict[str, list[str]] = {"pro_debater": [], "con_debater": []}
 
         async def turn(role: str, prompt: str) -> str:
-            response = await self.messenger.talk_to_agent(
+            artifact = await self.messenger.talk_to_agent(
                 prompt, str(participants[role]), new_conversation=False
             )
-            logger.info(f"{role}: {response}")
-            debate[role].append(response)
+
+            # Extract the argument text
+            if hasattr(artifact.root, "data"):
+                response_text = artifact.root.data.get("argument", "")
+            else:
+                response_text = getattr(artifact.root, "text", "")
+
+            debate[role].append(response_text)
             await updater.update_status(
-                TaskState.working, new_agent_text_message(f"{role}: {response}")
+                TaskState.working, new_agent_text_message(f"{role}: {response_text}")
             )
-            return response
+            return response_text
 
         # Opening turns
         response = await turn(

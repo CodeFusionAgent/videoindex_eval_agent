@@ -21,27 +21,28 @@ def main():
     args = parser.parse_args()
 
     skill = AgentSkill(
-        id="moderate_and_judge_debate",
-        name="Orchestrates and judges debate",
-        description="Orchestrate and judge a debate between two agents on a given topic.",
-        tags=["debate"],
+        id="evaluate_qa_response",
+        name="Evaluate Q&A Response",
+        description="Send a question to a Q&A agent and evaluate the response quality.",
+        tags=["evaluation", "qa"],
         examples=["""
 {
   "participants": {
-    "pro_debater": "https://pro-debater.example.com:443",
-    "con_debater": "https://con-debater.example.org:8443"
+    "qa_agent": "https://qa-agent.example.com:443"
   },
   "config": {
-    "topic": "Should artificial intelligence be regulated?",
-    "num_rounds": 3
+    "question": "How does request processing work in FastAPI?",
+    "reference_answer": "Optional reference answer for grounding evaluation...",
+    "repo_url": "https://github.com/tiangolo/fastapi",
+    "judge_model": "gemini-2.5-flash"
   }
 }
 """]
     )
 
     agent_card = AgentCard(
-        name="Debate Judge",
-        description="Orchestrate and judge a structured debate between pro and con agents on a given topic with multiple rounds of arguments.",
+        name="Q&A Evaluator",
+        description="Evaluate Q&A agent responses on codebase questions using architecture reasoning, consistency, code understanding, and grounding criteria.",
         url=args.card_url or f"http://{args.host}:{args.port}/",
         version='1.0.0',
         default_input_modes=['text'],

@@ -1,19 +1,19 @@
 # Codewalk Eval Agent (Green Agent)
 
-A Green Agent that evaluates Q&A agents on their ability to answer technical questions about open-source codebases. Built for the [AgentBeats](https://agentbeats.dev) platform using the [A2A (Agent-to-Agent)](https://a2a-protocol.org/latest/) protocol.
+A Green Agent that evaluates Q&A agents on their ability to help software engineers interact with a codebase, build understanding of its concepts, and contribute back. Built for the [AgentBeats](https://agentbeats.dev) platform using the [A2A (Agent-to-Agent)](https://a2a-protocol.org/latest/) protocol.
 
 **Registered Agent:** [codewalk-eval-agent on AgentBeats](https://agentbeats.dev/anamsarfraz/codewalk-eval-agent)
 
 ## Abstract
 
-**Codewalk Q&A Evaluator** benchmarks AI agents on their ability to answer technical questions about open-source codebases. Given a question about a repository (e.g., "How does request processing work in FastAPI?"), the evaluator sends it to a Q&A agent via the A2A protocol, then uses an LLM judge to score the response on four dimensions:
+**Codewalk Q&A Evaluator** benchmarks AI agents on their ability to help software engineers interact with a codebase, build understanding of its concepts, and contribute back. Given a question about a repository (e.g., "How does request processing work in FastAPI?"), the evaluator sends it to a Q&A agent via the A2A protocol, then uses an LLM judge to score the response on four dimensions:
 
-1. **Architecture-Level Reasoning** (0-5) - Clear reasoning about system design, modules, architecture
-2. **Reasoning Consistency** (0-5) - Logical, coherent flow
-3. **Code Understanding Tier** (0-5) - Categorized as performance/runtime/inter-module/architectural
-4. **Grounding** (0-5) - Factual accuracy, alignment with reference answer if provided
+- **Architecture-Level Reasoning** (0-5) – Clear reasoning about system design, modules, and architecture
+- **Reasoning Consistency** (0-5) – Logical, coherent flow of explanation
+- **Code Understanding Tier** (0-5) – Depth of understanding from performance to architectural level
+- **Grounding** (0-5) – Factual accuracy and alignment with reference answers
 
-The benchmark supports multiple judge models (Gemini, GPT-4o, Claude) and enables reproducible evaluation through deterministic configurations.
+While currently evaluating against open-source repositories, the system supports closed-source codebases as well. The benchmark supports multiple judge models (Gemini, Claude, etc.) and is part of the broader Codewalk project, which aims to build AI that maintains deep understanding of codebases from multiple software engineering perspectives—architecture, reliability, maintainability, and beyond.
 
 ## How It Works
 

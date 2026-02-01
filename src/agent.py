@@ -2,9 +2,11 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 import openai
+import yaml
 from pydantic import BaseModel, HttpUrl, ValidationError
 from dotenv import load_dotenv
 
@@ -18,26 +20,24 @@ from messenger import Messenger
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("qa_evaluator")
+logger = logging.getLogger("videoindex_evaluator")
 
+EVAL_DATA_DIR = os.getenv("EVAL_DATA_DIR", "data")
 
 # Judge model configurations - all use OpenAI-compatible API
 JUDGE_MODELS = {
-    # OpenAI models
     "gpt-4o": {
-        "base_url": None,  # Uses default OpenAI endpoint
+        "base_url": None,
         "api_key_env": "OPENAI_API_KEY",
     },
     "gpt-4o-mini": {
         "base_url": None,
         "api_key_env": "OPENAI_API_KEY",
     },
-    # Anthropic models (via OpenAI-compatible endpoint)
     "claude-sonnet-4-5": {
         "base_url": "https://api.anthropic.com/v1/",
         "api_key_env": "ANTHROPIC_API_KEY",
     },
-    # Google models (via OpenAI-compatible endpoint)
     "gemini-2.5-flash": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "api_key_env": "GOOGLE_API_KEY",
@@ -51,70 +51,60 @@ JUDGE_MODELS = {
 DEFAULT_JUDGE_MODEL = "gemini-2.5-flash"
 
 
-def parse_evaluation_json(eval_text: str) -> dict:
-    """Parse JSON evaluation response, handling potential formatting issues."""
-    try:
-        # Try to find JSON content between curly braces
-        json_match = re.search(r'\{.*\}', eval_text, re.DOTALL)
-        if json_match:
-            json_str = json_match.group()
-            return json.loads(json_str)
-        else:
-            # Fallback - try to parse the whole text
-            return json.loads(eval_text)
-    except (json.JSONDecodeError, AttributeError):
-        # Return a default structure if parsing fails
-        return {
-            "architecture_reasoning": {"score": 0, "feedback": "Parse error"},
-            "reasoning_consistency": {"score": 0, "feedback": "Parse error"},
-            "code_understanding_tier": {"tier": "unknown", "score": 0, "feedback": "Parse error"},
-            "grounding": {"score": 0, "feedback": "Parse error"}
-        }
+def load_eval_data(data_dir: str) -> list[dict]:
+    """Load evaluation data with correct answers from YAML files."""
+    eval_data = []
+    data_path = Path(data_dir)
+    if not data_path.exists():
+        logger.warning(f"Data directory does not exist: {data_dir}")
+        return eval_data
+    for yaml_file in data_path.glob("*.yaml"):
+        try:
+            with open(yaml_file) as f:
+                data = yaml.safe_load(f)
+                if data and "questions" in data:
+                    num_questions = len(data["questions"])
+                    eval_data.extend(data["questions"])
+                    logger.info(f"Loaded {num_questions} questions from {yaml_file.name}")
+        except Exception as e:
+            logger.error(f"Failed to load {yaml_file.name}: {e}")
+    logger.info(f"Total evaluation questions loaded: {len(eval_data)}")
+    return eval_data
+
+
+def find_correct_answer(question: str, eval_data: list[dict]) -> dict | None:
+    """Find the correct answer for a question."""
+    question_lower = question.lower().strip()
+    for qa in eval_data:
+        if qa.get("question", "").lower().strip() == question_lower:
+            return qa
+    return None
 
 
 class EvalRequest(BaseModel):
     """Request format sent by the AgentBeats platform to green agents."""
-    participants: dict[str, HttpUrl]  # role -> agent URL (expects "qa_agent")
-    config: dict[str, Any]  # expects "question", optional "reference_answer", and "repo_url"
-
-
-class ScoreWithFeedback(BaseModel):
-    """A score with detailed feedback."""
-    score: int  # 0-5
-    feedback: str
-
-
-class CodeUnderstandingScore(BaseModel):
-    """Code understanding evaluation with tier classification."""
-    tier: str  # performance-related, runtime-related, inter-module, architectural
-    score: int  # 0-5
-    feedback: str
-
-
-class AnswerScore(BaseModel):
-    """Evaluation scores for a single answer."""
-    architecture_reasoning: ScoreWithFeedback
-    reasoning_consistency: ScoreWithFeedback
-    code_understanding_tier: CodeUnderstandingScore
-    grounding: ScoreWithFeedback
+    participants: dict[str, HttpUrl]
+    config: dict[str, Any]
 
 
 class EvalResult(BaseModel):
-    """Evaluation result for a single question."""
+    """Evaluation result for a video Q&A question."""
     question: str
-    reference_answer: str | None
+    episode: str
+    clip: str
+    correct_answer: str
     agent_answer: str
-    repo_url: str
-    scores: AnswerScore
-    total_score: float  # average of 4 scores
+    similarity_score: float  # 0.0 to 1.0 based on semantic similarity
+    feedback: str
 
 
 class Agent:
-    required_roles: list[str] = ["codewalk-qa-agent"]
-    required_config_keys: list[str] = ["question", "repo_url"]
+    required_roles: list[str] = ["videoindex-qa-agent"]
+    required_config_keys: list[str] = ["question"]
 
     def __init__(self):
         self.messenger = Messenger()
+        self.eval_data = load_eval_data(EVAL_DATA_DIR)
 
     def _get_judge_client(self, model_name: str) -> tuple[openai.OpenAI, str]:
         """Get OpenAI-compatible client for the specified judge model."""
@@ -149,6 +139,73 @@ class Agent:
 
         return True, "ok"
 
+    async def evaluate_semantic_similarity(
+        self,
+        question: str,
+        correct_answer: str,
+        agent_answer: str,
+        judge_model: str = DEFAULT_JUDGE_MODEL,
+    ) -> tuple[float, str]:
+        """Evaluate semantic similarity between agent answer and correct answer using LLM."""
+
+        evaluation_prompt = f"""You are evaluating whether two answers to a question about a video are semantically equivalent.
+
+**Question:** {question}
+
+**Correct Answer:** {correct_answer}
+
+**Agent's Answer:** {agent_answer}
+
+Evaluate the semantic similarity between the correct answer and the agent's answer. Consider:
+- Do they convey the same meaning?
+- Are they referring to the same concept/event/reasoning?
+- Minor wording differences are acceptable if the meaning is the same.
+
+Respond with a JSON object:
+{{
+    "score": <float between 0.0 and 1.0>,
+    "feedback": "<brief explanation of your scoring>"
+}}
+
+Scoring guide:
+- 1.0: Semantically identical or equivalent meaning
+- 0.7-0.9: Very similar, minor differences that don't change the core meaning
+- 0.4-0.6: Partially similar, some overlap but missing key elements
+- 0.1-0.3: Slightly related but mostly different
+- 0.0: Completely different or contradictory"""
+
+        client, resolved_model = self._get_judge_client(judge_model)
+
+        logger.info(f"Evaluating semantic similarity with judge model: {resolved_model}")
+
+        try:
+            response = client.chat.completions.create(
+                model=resolved_model,
+                messages=[
+                    {"role": "system", "content": "You are a precise evaluator of semantic similarity between answers."},
+                    {"role": "user", "content": evaluation_prompt}
+                ],
+            )
+
+            response_text = response.choices[0].message.content.strip()
+
+            # Parse JSON from response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                parsed = json.loads(json_match.group())
+                score = float(parsed.get("score", 0.0))
+                feedback = parsed.get("feedback", "No feedback provided")
+                # Clamp score between 0 and 1
+                score = max(0.0, min(1.0, score))
+                return score, feedback
+            else:
+                logger.error(f"Could not parse JSON from response: {response_text}")
+                return 0.0, "Failed to parse evaluation response"
+
+        except Exception as e:
+            logger.error(f"Error during semantic similarity evaluation: {e}")
+            return 0.0, f"Evaluation error: {str(e)}"
+
     async def run(self, message: Message, updater: TaskUpdater) -> None:
         input_text = get_message_text(message)
 
@@ -163,10 +220,18 @@ class Agent:
             return
 
         question = request.config["question"]
-        reference_answer = request.config.get("reference_answer")
-        repo_url = request.config["repo_url"]
         judge_model = request.config.get("judge_model", DEFAULT_JUDGE_MODEL)
-        qa_agent_url = str(request.participants["codewalk-qa-agent"])
+        qa_agent_url = str(request.participants["videoindex-qa-agent"])
+
+        # Find the correct answer from our evaluation data
+        qa_entry = find_correct_answer(question, self.eval_data)
+        if not qa_entry:
+            await updater.reject(new_agent_text_message(f"Question not found in evaluation dataset: {question[:100]}..."))
+            return
+
+        correct_answer = qa_entry["correct_answer"]
+        episode = qa_entry.get("episode", "unknown")
+        clip = qa_entry.get("clip", "unknown")
 
         await updater.update_status(
             TaskState.working,
@@ -185,135 +250,30 @@ class Agent:
 
         await updater.update_status(
             TaskState.working,
-            new_agent_text_message(f"Received answer. Evaluating with {judge_model}...")
+            new_agent_text_message(f"Received answer. Evaluating semantic similarity with {judge_model}...")
         )
 
-        # Evaluate the answer
-        scores = await self.evaluate_answer(question, reference_answer, agent_answer, repo_url, judge_model)
-
-        total_score = (
-            scores.architecture_reasoning.score +
-            scores.reasoning_consistency.score +
-            scores.code_understanding_tier.score +
-            scores.grounding.score
-        ) / 4.0
+        # Evaluate semantic similarity using LLM
+        score, feedback = await self.evaluate_semantic_similarity(
+            question, correct_answer, agent_answer, judge_model
+        )
 
         eval_result = EvalResult(
             question=question,
-            reference_answer=reference_answer,
+            episode=episode,
+            clip=clip,
+            correct_answer=correct_answer,
             agent_answer=agent_answer,
-            repo_url=repo_url,
-            scores=scores,
-            total_score=total_score,
+            similarity_score=score,
+            feedback=feedback,
         )
 
-        logger.info(f"Evaluation complete. Total score: {total_score:.2f}/5")
+        logger.info(f"Evaluation complete. Similarity score: {score:.2f}")
 
         await updater.add_artifact(
             parts=[
-                Part(root=TextPart(text=f"Evaluation complete. Score: {total_score:.2f}/5")),
+                Part(root=TextPart(text=f"Evaluation complete. Similarity score: {score:.2f}/1.0")),
                 Part(root=DataPart(data=eval_result.model_dump())),
             ],
             name="Result",
-        )
-
-    async def evaluate_answer(
-        self,
-        question: str,
-        reference_answer: str | None,
-        agent_answer: str,
-        repo_url: str,
-        judge_model: str = DEFAULT_JUDGE_MODEL,
-    ) -> AnswerScore:
-        """Evaluate a Q&A response using LLM judge."""
-
-        reference_section = ""
-        if reference_answer:
-            reference_section = f"""
-**Reference Answer:** {reference_answer}
-Use this reference answer as a guide for evaluating grounding and accuracy."""
-        else:
-            reference_section = f"""
-**Reference Answer:** Not provided.
-Use your knowledge of the {repo_url} open source repository to evaluate grounding and accuracy."""
-
-        evaluation_prompt = f"""
-You are a senior software engineer with 10 years of experience in software development.
-The question and answer pairs are designed to help a software engineer ramp up on the codebase for {repo_url}.
-The answers should follow the "life of X" style format (if the question is about understanding how something works and flows through the system, e.g., how does request processing work) so that it is helpful for an engineer to meaningfully contribute to the codebase.
-Please evaluate the following response based on accuracy, coherence, reasoning consistency, and grounding:
-
-**Question:** {question}
-{reference_section}
-
-**Model Response:** {agent_answer}
-
-**Evaluation Criteria:**
-1. **Architecture-Level Reasoning**: Does the response provide clear reasoning about the system's design, modules, or architecture? (Score 0-5)
-2. **Reasoning Consistency**: Is the reasoning consistent? Does it follow a logical and coherent flow? (Score 0-5)
-3. **Code Understanding Tier**: Categorize the question into one of the following tiers: performance-related, runtime-related, inter-module, or architectural. How well does the model understand the question within the given code understanding tier? (Score 0-5)
-4. **Grounding Score**: How factual and accurate is the response? If a reference answer is provided, evaluate alignment with it. Otherwise, use your knowledge of the {repo_url} repository to assess factual accuracy. (Score 0-5)
-
-Provide a detailed evaluation based on these criteria, and include the feedback and justification for each score. Be very strict in your evaluation. A high score needs to be backed by strong justification. Give your answer in the following JSON format (note: all scores should be integers, not strings):
-
-{{
-    "architecture_reasoning": {{
-        "score": <int>,
-        "feedback": "Detailed feedback about architecture reasoning"
-    }},
-    "reasoning_consistency": {{
-        "score": <int>,
-        "feedback": "Feedback about reasoning consistency"
-    }},
-    "code_understanding_tier": {{
-        "tier": "tier name",
-        "score": <int>,
-        "feedback": "Feedback about code understanding"
-    }},
-    "grounding": {{
-        "score": <int>,
-        "feedback": "Feedback about grounding"
-    }}
-}}
-"""
-
-        system_message = "You are a senior software engineer with 10 years of experience in software development."
-
-        # Get OpenAI-compatible client for the judge model
-        client, resolved_model = self._get_judge_client(judge_model)
-
-        logger.info(f"Evaluating with judge model: {resolved_model}")
-
-        # Call the API using OpenAI-compatible format
-        response = client.chat.completions.create(
-            model=resolved_model,
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": evaluation_prompt}
-            ],
-        )
-
-        # Parse JSON from response text
-        response_text = response.choices[0].message.content.strip()
-        parsed = parse_evaluation_json(response_text)
-
-        # Convert to Pydantic model
-        return AnswerScore(
-            architecture_reasoning=ScoreWithFeedback(
-                score=int(parsed["architecture_reasoning"]["score"]),
-                feedback=parsed["architecture_reasoning"]["feedback"],
-            ),
-            reasoning_consistency=ScoreWithFeedback(
-                score=int(parsed["reasoning_consistency"]["score"]),
-                feedback=parsed["reasoning_consistency"]["feedback"],
-            ),
-            code_understanding_tier=CodeUnderstandingScore(
-                tier=parsed["code_understanding_tier"]["tier"],
-                score=int(parsed["code_understanding_tier"]["score"]),
-                feedback=parsed["code_understanding_tier"]["feedback"],
-            ),
-            grounding=ScoreWithFeedback(
-                score=int(parsed["grounding"]["score"]),
-                feedback=parsed["grounding"]["feedback"],
-            ),
         )

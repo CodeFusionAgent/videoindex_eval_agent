@@ -1,0 +1,123 @@
+description: Evaluation dataset with correct answers
+questions:
+- clip: s01e02_seg02_clip_12
+  correct_answer: Raj had become excited and did not want Penny to know .
+  correct_key: a3
+  episode: s01e02
+  qid: 133290
+  question: Why did Raj tell himself to turn his pelvis when Penny was giving him a hug ?
+- clip: s01e03_seg02_clip_05
+  correct_answer: Because Lesley tells Leonard there was no arousal in his kiss .
+  correct_key: a3
+  episode: s01e03
+  qid: 128609
+  question: Why is Leonard disappointed when he leaves the laboratory ?
+- clip: s02e01_seg02_clip_11
+  correct_answer: irritated
+  correct_key: a0
+  episode: s02e01
+  qid: 124994
+  question: How did Raj feel when Sheldon thought Raj did n't know Indian cinema ?
+- clip: s02e02_seg02_clip_04
+  correct_answer: Because Sheldon had pernicious anemia in 1999 .
+  correct_key: a4
+  episode: s02e02
+  qid: 123674
+  question: Why did Sheldon say he had to stop playing Mario when he found the memory card his mother sent ?
+- clip: s02e03_seg02_clip_06
+  correct_answer: Because Sheldon was not wearing bottoms .
+  correct_key: a2
+  episode: s02e03
+  qid: 125081
+  question: Why did Penny tell Leonard to not enter Sheldon 's room after leaving the room herself ?
+- clip: s02e04_seg02_clip_07
+  correct_answer: He looks disappointed
+  correct_key: a1
+  episode: s02e04
+  qid: 136097
+  question: How does Raf look after Charlie Sheen speaks to him ?
+- clip: s01e04_seg02_clip_03
+  correct_answer: Because Penny thought Sheldon was estimating her body mass too high .
+  correct_key: a1
+  episode: s01e04
+  qid: 124091
+  question: Why was Penny upset after Sheldon said 120 for her ?
+- clip: s01e06_seg02_clip_13
+  correct_answer: Because you bring guests a hot beverage when they 're upset .
+  correct_key: a3
+  episode: s01e06
+  qid: 129376
+  question: Why did Sheldon bring Leonard tea after the Halloween party ?
+- clip: s01e08_seg02_clip_00
+  correct_answer: Angry
+  correct_key: a1
+  episode: s01e08
+  qid: 135277
+  question: How does Raj act after listening to the message ?
+- clip: s01e10_seg01_clip_02
+  correct_answer: Because Leonard did n't have faith in Penny 's talent and thought the production would be bad .
+  correct_key: a3
+  episode: s01e10
+  qid: 124728
+  question: Why did Leonard refuse when Penny invited Leonard and Sheldon to come to her production ?
+- clip: s01e13_seg02_clip_01
+  correct_answer: sad
+  correct_key: a3
+  episode: s01e13
+  qid: 133503
+  question: How did Penny feel when she had to quiz the guys on a Saturday ?
+- clip: s01e14_seg02_clip_06
+  correct_answer: They gave her shift away
+  correct_key: a3
+  episode: s01e14
+  qid: 128876
+  question: Why is Penny upset when she gets to work after crawling on the fire escape
+- clip: s01e16_seg02_clip_08
+  correct_answer: impatient
+  correct_key: a3
+  episode: s01e16
+  qid: 133686
+  question: How did Penny feel when Sheldon was taking his time picking the present out ?
+- clip: s01e17_seg02_clip_07
+  correct_answer: Mike was with someone else .
+  correct_key: a2
+  episode: s01e17
+  qid: 133139
+  question: Why is Penny crying when Leonard walks in ?
+- clip: s02e07_seg02_clip_04
+  correct_answer: Because Penny sits at Sheldon 's spot ?
+  correct_key: a3
+  episode: s02e07
+  qid: 133289
+  question: Why is Sheldon mad at Penny when she sits down ?
+- clip: s02e12_seg02_clip_08
+  correct_answer: reluctant
+  correct_key: a1
+  episode: s02e12
+  qid: 129540
+  question: How did Penny feel when Leonard asked her to do him a favor ?
+- clip: s02e14_seg02_clip_02
+  correct_answer: worried
+  correct_key: a3
+  episode: s02e14
+  qid: 131639
+  question: How did Penny feel when Sheldon tried to give her money ?
+- clip: s02e16_seg02_clip_04
+  correct_answer: happy
+  correct_key: a2
+  episode: s02e16
+  qid: 130045
+  question: How did Howard feel when he was visiting with Leslie ?
+- clip: s02e17_seg02_clip_09
+  correct_answer: Surprised
+  correct_key: a4
+  episode: s02e17
+  qid: 136476
+  question: How did Penny act after she found out she was really on the phone with Sheldon ?
+- clip: s02e18_seg01_clip_00
+  correct_answer: Leonard sprayed aerosol spray to make the laser beams visible .
+  correct_key: a0
+  episode: s02e18
+  qid: 126842
+  question: How was Leonard able to see the laser beams when they were invisible ?
+title: LongTVQA - The Big Bang Theory

@@ -21,19 +21,17 @@ def main():
     args = parser.parse_args()
 
     skill = AgentSkill(
-        id="evaluate_qa_response",
-        name="Evaluate Q&A Response",
-        description="Send a question to a Q&A agent and evaluate the response quality.",
-        tags=["evaluation", "qa"],
+        id="evaluate_video_qa",
+        name="Evaluate Video Q&A Response",
+        description="Send a question to a Q&A agent and evaluate the response using semantic similarity.",
+        tags=["evaluation", "video", "qa"],
         examples=["""
 {
   "participants": {
-    "qa_agent": "https://qa-agent.example.com:443"
+    "videoindex-qa-agent": "https://qa-agent.example.com:443"
   },
   "config": {
-    "question": "How does request processing work in FastAPI?",
-    "reference_answer": "Optional reference answer for grounding evaluation...",
-    "repo_url": "https://github.com/tiangolo/fastapi",
+    "question": "Why did Raj tell himself to turn his pelvis when Penny was giving him a hug?",
     "judge_model": "gemini-2.5-flash"
   }
 }
@@ -41,8 +39,8 @@ def main():
     )
 
     agent_card = AgentCard(
-        name="Q&A Evaluator",
-        description="Evaluate Q&A agent responses on codebase questions using architecture reasoning, consistency, code understanding, and grounding criteria.",
+        name="VideoIndex Evaluator",
+        description="Evaluate video Q&A agent responses using semantic similarity scoring.",
         url=args.card_url or f"http://{args.host}:{args.port}/",
         version='1.0.0',
         default_input_modes=['text'],
